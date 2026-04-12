@@ -46,7 +46,7 @@ def get_youtube_videos(query):
     return request.execute()
 
 # 4. App Content
-st.title("🚀 StudyAI Master: Board Prep 2026")
+st.title("🚀 StudyAI Master:")
 st.caption("Powered by Modern Digital Services")
 
 if GEMINI_KEY:
