@@ -40,7 +40,7 @@ def get_youtube_videos(query):
 
 # 4. App Logic
 st.title("🎯 BoardMaster AI: Class 10 Edition")
-st.write(f"Logged in as: **{st.secrets.get('USER_NAME', 'Student')}** | Location: Asansol")
+st.write(f"Logged in as: **{st.secrets.get('USER_NAME', 'Student')}**")
 
 if GEMINI_KEY:
     try:
