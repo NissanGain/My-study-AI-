@@ -53,7 +53,7 @@ if GEMINI_KEY:
             st.subheader("Instant Doubt Clearing")
             q = st.text_input("Ask any concept question...")
             if st.button("Solve My Doubt"):
-                resp = client.models.generate_content(model='gemini-1.5-flash', contents=q)
+                resp = client.models.generate_content(model='gemini-2.5-flash-lite', contents=q)
                 st.markdown(f'<div class="question-card">{resp.text}</div>', unsafe_allow_html=True)
 
         with tab2:
@@ -61,7 +61,7 @@ if GEMINI_KEY:
             sub = st.selectbox("Select Subject", ["Maths", "Physics", "Chemistry", "Biology", "Social Science (SST)", "English"])
             if st.button("Predict High-Weightage Topics"):
                 prompt = f"Act as a board examiner. Identify 5 high-yield topics for Class 10 {sub} for the 2026 exams. Focus on patterns from the last 10 years."
-                resp = client.models.generate_content(model='gemini-1.5-flash', contents=prompt)
+                resp = client.models.generate_content(model='gemini-2.5-flash-lite', contents=prompt)
                 st.info(resp.text)
 
         with tab3:
@@ -79,7 +79,7 @@ if GEMINI_KEY:
             if st.button("Generate Important Questions"):
                 with st.spinner("Analyzing past papers..."):
                     prompt = f"Generate 5 most important {q_type} questions for Class 10 {pyq_sub}, Chapter: {chapter}. Base these on the frequency they appeared in past 10-year board papers. Include a tiny 'Hint' for each answer."
-                    resp = client.models.generate_content(model='gemini-1.5-flash', contents=prompt)
+                    resp = client.models.generate_content(model='gemini-2.5-flash-lite', contents=prompt)
                     st.markdown(f'<div class="question-card">{resp.text}</div>', unsafe_allow_html=True)
 
         with tab4:
