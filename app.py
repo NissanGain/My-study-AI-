@@ -70,9 +70,9 @@ if GEMINI_KEY:
             
             col1, col2 = st.columns(2)
             with col1:
-                pyq_sub = st.selectbox("Subject", ["Social Science", "Science", "Mathematics"], key="pyq_sub")
+                pyq_sub = st.selectbox("Subject", ["Social Science", "Science", "Mathematics", "English"], key="pyq_sub")
             with col2:
-                q_type = st.selectbox("Question Type", ["Short Answer (2m)", "Long Answer (5m)", "Case-Based", "MCQs"])
+                q_type = st.selectbox("Question Type", ["Short Answer (2m)", "Long Answer (5m)", "Case-Based", "MCQs", "Competency-Based Questions"])
             
             chapter = st.text_input("Enter Chapter Name (e.g., Nationalism in Europe, Electricity)")
             
