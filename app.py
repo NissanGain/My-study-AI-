@@ -33,8 +33,8 @@ def get_youtube_videos(query):
     if not YOUTUBE_KEY: return None
     youtube = build('youtube', 'v3', developerKey=YOUTUBE_KEY)
     request = youtube.search().list(
-        q=query + " class 10 boards ncert explanation",
-        part='snippet', maxResults=3, type='video'
+        q=query + " class 10 boards one shot ",
+        part='snippet', maxResults=6, type='video'
     )
     return request.execute()
 
