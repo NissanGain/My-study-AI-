@@ -34,7 +34,7 @@ def get_youtube_videos(query):
     youtube = build('youtube', 'v3', developerKey=YOUTUBE_KEY)
     request = youtube.search().list(
         q=query + " class 10 boards one shot ",
-        part='snippet', maxResults=6, type='video'
+        part='snippet', maxResults=10, type='video'
     )
     return request.execute()
 
