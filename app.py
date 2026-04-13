@@ -1,97 +1,102 @@
 import streamlit as st
+from groq import Groq
+from duckduckgo_search import DDGS
 from google import genai
-from googleapiclient.discovery import build
 
-# 1. API Setup
+# --- 1. SETUP & SECRETS ---
+GROQ_KEY = st.secrets.get("GROQ_API_KEY")
 GEMINI_KEY = st.secrets.get("GEMINI_API_KEY")
-YOUTUBE_KEY = st.secrets.get("YOUTUBE_API_KEY")
 
-# 2. Modern CSS Styling
+st.set_page_config(page_title="StudyAI Master", page_icon="🎯", layout="wide")
+
+# --- 2. STYLING ---
 st.markdown("""
     <style>
-    .main { background: #f0f2f6; }
-    .stButton>button {
-        border-radius: 12px;
-        background: linear-gradient(90deg, #4A90E2, #50C878);
-        color: white;
-        height: 3em;
-        font-weight: bold;
-    }
-    .question-card {
-        background-color: #ffffff;
+    .stApp { background-color: #0E1117; color: white; }
+    .answer-box {
+        background-color: #1E2130;
         padding: 20px;
-        border-radius: 10px;
-        border-left: 8px solid #50C878;
+        border-radius: 15px;
+        border-left: 5px solid #4A90E2;
         margin-bottom: 20px;
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. YouTube Helper
-def get_youtube_videos(query):
-    if not YOUTUBE_KEY: return None
-    youtube = build('youtube', 'v3', developerKey=YOUTUBE_KEY)
-    request = youtube.search().list(
-        q=query + " class 10 boards one shot ",
-        part='snippet', maxResults=10, type='video'
-    )
-    return request.execute()
-
-# 4. App Logic
-st.title("🎯 BoardMaster AI: Class 10 Edition")
-st.write(f"Logged in as: **{st.secrets.get('USER_NAME', 'Student')}**")
-
-if GEMINI_KEY:
+# --- 3. HELPER FUNCTIONS ---
+def get_web_context(query):
     try:
-        client = genai.Client(api_key=GEMINI_KEY)
-        
-        # New Tab Layout including PYQ Section
-        tab1, tab2, tab3, tab4 = st.tabs(["💬 Doubt Solver", "📈 Topic Predictor", "📝 PYQ & Questions", "📺 Videos"])
+        with DDGS() as ddgs:
+            results = [r['body'] for r in ddgs.text(query, max_results=3)]
+            return "\n".join(results)
+    except Exception:
+        return "No live web data found."
 
-        with tab1:
-            st.subheader("Instant Doubt Clearing")
-            q = st.text_input("Ask any concept question...")
-            if st.button("Solve My Doubt"):
-                resp = client.models.generate_content(model='gemini-2.5-flash-lite', contents=q)
-                st.markdown(f'<div class="question-card">{resp.text}</div>', unsafe_allow_html=True)
+# --- 4. MAIN INTERFACE ---
+st.title("🎯 StudyAI Master")
+st.caption("2026 Board Exam Prep | Powered by Groq & Gemini")
 
-        with tab2:
-            st.subheader("Topic Predictor")
-            sub = st.selectbox("Select Subject", ["Maths", "Physics", "Chemistry", "Biology", "Social Science (SST)", "English"])
-            if st.button("Predict High-Weightage Topics"):
-                prompt = f"Act as a board examiner. Identify 5 high-yield topics for Class 10 {sub} for the 2026 exams. Focus on patterns from the last 10 years."
-                resp = client.models.generate_content(model='gemini-2.5-flash-lite', contents=prompt)
-                st.info(resp.text)
+# Sidebar for Status
+with st.sidebar:
+    st.header("⚡ System Status")
+    if GROQ_KEY: st.success("Groq: 14,400 RPD Active")
+    if GEMINI_KEY: st.info("Gemini: 20 RPD Backup Active")
+    st.divider()
+    st.write("📍 Location: Asansol/Durgapur Hub")
+    st.write("🎓 Target: 95%+ in Class 10 Boards")
 
-        with tab3:
-            st.subheader("📜 PYQ & Most Important Questions")
-            st.write("Generate questions based on past 10-year patterns.")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                pyq_sub = st.selectbox("Subject", ["Social Science", "Science", "Mathematics", "English"], key="pyq_sub")
-            with col2:
-                q_type = st.selectbox("Question Type", ["Short Answer (2m)", "Long Answer (5m)", "Case-Based", "MCQs", "Competency-Based Questions"])
-            
-            chapter = st.text_input("Enter Chapter Name (e.g., Nationalism in Europe, Electricity)")
-            
-            if st.button("Generate Important Questions"):
-                with st.spinner("Analyzing past papers..."):
-                    prompt = f"Generate 5 most important {q_type} questions for Class 10 {pyq_sub}, Chapter: {chapter}. Base these on the frequency they appeared in past 10-year board papers. Include a tiny 'Hint' for each answer."
-                    resp = client.models.generate_content(model='gemini-2.5-flash-lite', contents=prompt)
-                    st.markdown(f'<div class="question-card">{resp.text}</div>', unsafe_allow_html=True)
+# Tabs for Different Features
+tab1, tab2, tab3 = st.tabs(["🚀 Doubt Solver (Unlimited)", "📈 Board Predictor", "📜 PYQ Vault"])
 
-        with tab4:
-            st.subheader("Visual Learning")
-            vid_q = st.text_input("Search for specific topic videos:")
-            if st.button("Fetch Lessons"):
-                results = get_youtube_videos(vid_q)
-                if results:
-                    for item in results['items']:
-                        st.video(f"https://www.youtube.com/watch?v={item['id']['videoId']}")
+with tab1:
+    st.subheader("Instant Doubt Solver with Web Search")
+    user_q = st.text_input("Ask any question (e.g., 'Latest CBSE 2026 syllabus update'):")
+    
+    if st.button("Solve Now"):
+        if not GROQ_KEY:
+            st.error("Please add GROQ_API_KEY to your Streamlit Secrets.")
+        else:
+            with st.spinner("Searching the web & generating answer..."):
+                # Call Groq + Web Search
+                client = Groq(api_key=GROQ_KEY)
+                web_info = get_web_context(user_q)
+                
+                full_prompt = f"Context from Web:\n{web_info}\n\nQuestion: {user_q}\n\nAnswer like an expert Class 10 teacher:"
+                
+                response = client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=[{"role": "user", "content": full_prompt}]
+                )
+                
+                st.markdown(f'<div class="answer-box">{response.choices[0].message.content}</div>', unsafe_allow_html=True)
+                st.caption("🔍 Sources: Live DuckDuckGo Search | Model: Llama 3.1 (Groq)")
 
-    except Exception as e:
-        st.error(f"Error: {e}")
-else:
-    st.warning("Connect your API keys in Settings to start!")
+with tab2:
+    st.subheader("Deep Logic Board Predictor")
+    st.write("Using Gemini's advanced reasoning for exam patterns.")
+    predict_q = st.text_input("Enter subject for 2026 prediction:")
+    
+    if st.button("Analyze Patterns"):
+        if not GEMINI_KEY:
+            st.error("Please add GEMINI_API_KEY to your Streamlit Secrets.")
+        else:
+            with st.spinner("Gemini is analyzing 10 years of data..."):
+                client = genai.Client(api_key=GEMINI_KEY)
+                resp = client.models.generate_content(
+                    model='gemini-2.5-flash-lite', 
+                    contents=f"Predict high-weightage topics for 2026 Boards: {predict_q}"
+                )
+                st.markdown(f'<div class="answer-box">{resp.text}</div>', unsafe_allow_html=True)
+                st.caption("🧠 Intelligence: Gemini 2.5 Flash Lite")
+
+with tab3:
+    st.subheader("PYQ Vault")
+    subject = st.selectbox("Select Subject", ["Science", "Math", "SST", "English"])
+    if st.button("Get Important PYQs"):
+        client = Groq(api_key=GROQ_KEY)
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": f"List 10 most repeated Class 10 {subject} PYQs for Board Exams."}]
+        )
+        st.write(response.choices[0].message.content)
+
