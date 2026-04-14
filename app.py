@@ -41,6 +41,7 @@ def call_groq(user_prompt, model="llama-3.1-8b-instant"):
     # SYSTEM INSTRUCTION: Fixes the 2023 knowledge cutoff error
     system_instruction = (
         "You are 'StudyAI Master', a highly advanced live AI tutor created by Nissan Gain. "
+        "Today's date is Tuesday, April 14, 2026. "
         "You have REAL-TIME access to the internet. NEVER mention 'knowledge cutoffs' or 2023. "
         "If Web Context is provided, you MUST use it to give a current, factual answer. "
         "Always answer in a supportive, expert teacher tone."
@@ -139,5 +140,4 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True
-    )
-    
+        )
