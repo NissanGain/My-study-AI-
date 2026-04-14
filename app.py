@@ -99,7 +99,7 @@ with tab2:
 # TAB 3: PYQ VAULT
 with tab3:
     st.subheader("Recent PYQ Generator")
-    pyq_search = st.toggle("Search for 10 year pyq actual board question including 2025 -26 paper s?", value=True, key="pyq_search")
+    pyq_search = st.toggle("Search for 10 year pyq actual board question including 2025 -26 paper?", value=True, key="pyq_search")
     pyq_sub = st.selectbox("Select Subject:", ["Math", "Science", "SST", "English"], key="pyq_sub_sel")
     chapter = st.text_input("Chapter Name:", placeholder="e.g. Nationalism in India")
     
