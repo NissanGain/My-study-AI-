@@ -16,6 +16,7 @@ st.markdown("""
         border-radius: 12px;
         border-left: 5px solid #4A90E2;
         margin-bottom: 10px;
+        color: inherit;
     }
     .stButton>button { border-radius: 10px; width: 100%; font-weight: bold; }
     .footer { text-align: center; padding: 20px; font-size: 1.1em; opacity: 0.8; }
@@ -23,60 +24,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 3. HELPER FUNCTIONS ---
-def get_web_context(query, max_results=3):
-    try:
-        with DDGS() as ddgs:
-            results = [r['body'] for r in ddgs.text(query, max_results=max_results)]
-            return "\n".join(results)
-    except Exception:
-        return "No live web data found."
-
-def call_groq(prompt, model="llama-3.1-8b-instant"):
-  def call_groq(user_prompt, model="llama-3.1-8b-instant"):
-    if not GROQ_KEY:
-        return "Error: Missing API Key."
-    
-    client = Groq(api_key=GROQ_KEY)
-    
-    # This 'System Instruction' is the secret key
-    system_instruction = (
-        "You are 'StudyAI Master', a live AI created by Nissan Gain. "
-        "Today's date is Tuesday, April 14, 2026. "
-        "You have REAL-TIME access to the internet. Never mention 'knowledge cutoffs' or 'hypothetical scenarios'. "
-        "Use the provided Web Context to give a factual, current answer as an expert teacher."
-    )
-    
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": user_prompt}
-        ]
-    )
-    
-# --- 4. MAIN INTERFACE ---
-st.title("🎯 StudyAI Master")
-st.caption("2026 Board Exam Hub | Powered by Groq Unlimited")
-
-# Initialize Chat Memory for Doubt Solver
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["🚀 Doubt Solver", "📈 Predictor", "📜 PYQ Vault", "📝 Sample Gen"])
-
-# TAB 1: CONVERSATIONAL DOUBT SOLVER
-with tab1:
-    st.subheader("Instant Doubt Solver")
-    
-    # Search Toggle
-    ds_search = st.toggle("Search Web for latest info?", key="ds_search")
-    
-    # Display Chat History
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-       # --- 3. HELPER FUNCTIONS ---
-
 def get_web_context(query, max_results=3):
     try:
         with DDGS() as ddgs:
@@ -91,10 +38,9 @@ def call_groq(user_prompt, model="llama-3.1-8b-instant"):
     
     client = Groq(api_key=GROQ_KEY)
     
-    # This is the "Magic" instruction that fixes the 2023 cutoff error
+    # SYSTEM INSTRUCTION: Fixes the 2023 knowledge cutoff error
     system_instruction = (
         "You are 'StudyAI Master', a highly advanced live AI tutor created by Nissan Gain. "
-        "Today's date is Tuesday, April 14, 2026. "
         "You have REAL-TIME access to the internet. NEVER mention 'knowledge cutoffs' or 2023. "
         "If Web Context is provided, you MUST use it to give a current, factual answer. "
         "Always answer in a supportive, expert teacher tone."
@@ -111,38 +57,48 @@ def call_groq(user_prompt, model="llama-3.1-8b-instant"):
         return response.choices[0].message.content
     except Exception as e:
         return f"Groq Error: {str(e)}"
-    st.markdown(message["content"])
 
-    # Chat Input for Main Question & Follow-ups
-    if prompt := st.chat_input("Ask your doubt or a follow-up question..."):
-        # Add user message to state
+# --- 4. MAIN INTERFACE ---
+st.title("🎯 StudyAI Master")
+st.caption("2026 Board Exam Hub | Powered by Groq Unlimited")
+
+# Initialize Chat Memory
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Tabs
+tab1, tab2, tab3, tab4 = st.tabs(["🚀 Doubt Solver", "📈 Predictor", "📜 PYQ Vault", "📝 Sample Gen"])
+
+# TAB 1: CONVERSATIONAL DOUBT SOLVER
+with tab1:
+    st.subheader("Instant Doubt Solver")
+    ds_search = st.toggle("Search Web for latest info?", key="ds_search")
+    
+    # Display Chat History
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Chat Input
+    if prompt := st.chat_input("Ask your doubt or a follow-up..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Generate Response
         with st.spinner("Teacher is thinking..."):
-            context = ""
-            if ds_search:
-                context = f"Web Research: {get_web_context(prompt, 5)}\n\n"
-            
-            # Create a history string so the AI remembers the conversation
+            context = f"Web Research: {get_web_context(prompt, 5)}\n\n" if ds_search else ""
             history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
-            
-            full_query = f"{context}Conversation History:\n{history}\n\nTask: Answer the latest user question based on history and context. Act as a Class 10 teacher."
+            full_query = f"{context}History:\n{history}\n\nQuestion: {prompt}"
             
             response = call_groq(full_query)
-            
-            # Add assistant message to state
             st.session_state.messages.append({"role": "assistant", "content": response})
             with st.chat_message("assistant"):
                 st.markdown(response)
 
-    if st.button("Clear Chat Conversation"):
+    if st.button("Clear Conversation"):
         st.session_state.messages = []
         st.rerun()
 
-# --- (Other tabs remain the same as your previous working version) ---
 # TAB 2: PREDICTOR
 with tab2:
     st.subheader("2026 Topic Predictor")
@@ -183,4 +139,5 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True
-)
+    )
+    
