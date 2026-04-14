@@ -111,7 +111,7 @@ with tab4:
         q_type = st.selectbox("Question Type:", ["MCQs", "Short Answer (2-3 Marks)", "Long Answer (5 Marks)", "Case Based"], key="q_type")
     with col2:
         sq_topic = st.text_input("Topic/Chapter:", placeholder="e.g., Electricity or Life Processes", key="sq_topic")
-        q_num = st.slider("Number of questions:", 1, 10, 5, 20)
+        q_num = st.slider("Number of questions:", 1, 10, 5)
 
     if st.button("Generate Practice Set"):
         with st.spinner("Crafting NCERT-style questions..."):
