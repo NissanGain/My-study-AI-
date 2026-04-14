@@ -108,9 +108,21 @@ with tab3:
             if pyq_search:
                 search_query = f"Class 10 {pyq_sub} {chapter} actual board questions 2024 2025"
                 context = f"Recent Exam Data: {get_web_context(search_query, max_results=8)}\n\n"
-            # --- 5. FOOTER (YOUR NAME) ---
+class="answer-box">{pyqs}</div>', unsafe_allow_ht
+# --- FOOTER SECTION ---
 st.divider()
-st.markdown('<p class="footer-text">Created by <b>Nissan Gain</b></p>', unsafe_allow_html=True)
-            prompt = f"{context}Generate 5 very important PYQs for Class 10 {pyq_sub}, Chapter: {chapter}. Focus on questions that appeared recently."
-            pyqs = call_groq(prompt)
-            st.markdown(f'<div class="answer-box">{pyqs}</div>', unsafe_allow_html=True)
+st.markdown(
+    """
+    <style>
+    .footer {
+        text-align: center;
+        padding: 20px;
+        font-size: 1.2em;
+    }
+    </style>
+    <div class="footer">
+        Created by <b>Nissan Gain</b>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
