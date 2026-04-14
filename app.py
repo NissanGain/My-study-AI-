@@ -74,7 +74,7 @@ with tab1:
         with st.spinner("Teacher is thinking..."):
             context = ""
             if ds_search:
-                context = f"Web Research: {get_web_context(prompt, 3)}\n\n"
+                context = f"Web Research: {get_web_context(prompt, 5)}\n\n"
             
             # Create a history string so the AI remembers the conversation
             history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
