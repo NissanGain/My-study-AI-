@@ -108,7 +108,7 @@ with tab4:
     col1, col2 = st.columns(2)
     with col1:
         sq_sub = st.selectbox("Select Subject:", ["Science", "Math", "SST", "English", "Hindi"], key="sq_sub")
-        q_type = st.selectbox("Question Type:", ["MCQs", "Short Answer (2-3 Marks)", "Long Answer (5 Marks)", "Case Based"], key="q_type")
+        q_type = st.selectbox("Question Type:", ["MCQs","Very Short Answer Type(1-2 Marks)","Short Answer (2-3 Marks)", "Long Answer (5 Marks)", "Case Based"], key="q_type")
     with col2:
         sq_topic = st.text_input("Topic/Chapter:", placeholder="e.g., Electricity or Life Processes", key="sq_topic")
         q_num = st.slider("Number of questions:", 1, 20, 10)
