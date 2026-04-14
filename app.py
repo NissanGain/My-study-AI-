@@ -124,7 +124,7 @@ st.divider()
 st.markdown(
     """
     <div class="footer">
-        Created by <b>Nissan Gain</b>
+        Created by <b>Nissan Gain</b>  Last updated - April 2026
     </div>
     """,
     unsafe_allow_html=True
