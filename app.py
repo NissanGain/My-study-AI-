@@ -61,7 +61,6 @@ with st.sidebar:
     if GROQ_KEY:
         st.success("Groq AI Active (14.4k RPD)")
     st.divider()
-    st.write("📍 Asansol/Durgapur Hub")
     st.info("💡 Change Theme: Go to Settings > Theme in the top-right menu.")
 
 # Tabs
