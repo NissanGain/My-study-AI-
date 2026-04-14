@@ -60,7 +60,6 @@ with st.sidebar:
     if GROQ_KEY:
         st.success("Groq AI Active (14.4k RPD)")
     st.divider()
-    st.write("📍 Asansol/Durgapur Hub")
 
 # Tabs
 tab1, tab2, tab3, tab4 = st.tabs(["🚀 Doubt Solver", "📈 Predictor", "📜 PYQ Vault", "📝 Sample Paper Gen"])
