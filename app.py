@@ -32,14 +32,28 @@ def get_web_context(query, max_results=3):
         return "No live web data found."
 
 def call_groq(prompt, model="llama-3.1-8b-instant"):
-    if not GROQ_KEY: return "Error: Missing API Key."
+  def call_groq(user_prompt, model="llama-3.1-8b-instant"):
+    if not GROQ_KEY:
+        return "Error: Missing API Key."
+    
     client = Groq(api_key=GROQ_KEY)
+    
+    # This 'System Instruction' is the secret key
+    system_instruction = (
+        "You are 'StudyAI Master', a live AI created by Nissan Gain. "
+        "Today's date is Tuesday, April 14, 2026. "
+        "You have REAL-TIME access to the internet. Never mention 'knowledge cutoffs' or 'hypothetical scenarios'. "
+        "Use the provided Web Context to give a factual, current answer as an expert teacher."
+    )
+    
     response = client.chat.completions.create(
         model=model,
-        messages=[{"role": "user", "content": prompt}]
+        messages=[
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": user_prompt}
+        ]
     )
-    return response.choices[0].message.content
-
+    
 # --- 4. MAIN INTERFACE ---
 st.title("🎯 StudyAI Master")
 st.caption("2026 Board Exam Hub | Powered by Groq Unlimited")
@@ -61,7 +75,43 @@ with tab1:
     # Display Chat History
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+       # --- 3. HELPER FUNCTIONS ---
+
+def get_web_context(query, max_results=3):
+    try:
+        with DDGS() as ddgs:
+            results = [r['body'] for r in ddgs.text(query, max_results=max_results)]
+            return "\n".join(results)
+    except Exception:
+        return "No live web data found. Relying on NCERT knowledge."
+
+def call_groq(user_prompt, model="llama-3.1-8b-instant"):
+    if not GROQ_KEY:
+        return "Error: Please add your GROQ_API_KEY in Streamlit Secrets."
+    
+    client = Groq(api_key=GROQ_KEY)
+    
+    # This is the "Magic" instruction that fixes the 2023 cutoff error
+    system_instruction = (
+        "You are 'StudyAI Master', a highly advanced live AI tutor created by Nissan Gain. "
+        "Today's date is Tuesday, April 14, 2026. "
+        "You have REAL-TIME access to the internet. NEVER mention 'knowledge cutoffs' or 2023. "
+        "If Web Context is provided, you MUST use it to give a current, factual answer. "
+        "Always answer in a supportive, expert teacher tone."
+    )
+    
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_prompt}
+            ]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Groq Error: {str(e)}"
+    st.markdown(message["content"])
 
     # Chat Input for Main Question & Follow-ups
     if prompt := st.chat_input("Ask your doubt or a follow-up question..."):
