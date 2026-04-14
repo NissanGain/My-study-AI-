@@ -112,17 +112,17 @@ class="answer-box">{pyqs}</div>', unsafe_allow_ht
 # --- FOOTER SECTION ---
 st.divider()
 st.markdown(
-    """
-    <style>
-    .footer {
-        text-align: center;
-        padding: 20px;
-        font-size: 1.2em;
-    }
-    </style>
-    <div class="footer">
-        Created by <b>Nissan Gain</b>
-    </div>
-    """,
-    unsafe_allow_html=True
+"""
+<style>
+.footer {
+ text-align: center;
+ padding: 20px;
+ font-size: 1.2em;
+ }
+ </style>
+ <div class="footer">
+ Created by <b>Nissan Gain</b>
+ </div>
+ """,
+unsafe_allow_html=True
 )
