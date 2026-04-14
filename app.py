@@ -33,29 +33,33 @@ def get_web_context(query, max_results=3):
         return "No live web data found. Relying on NCERT knowledge."
 
 def call_groq(user_prompt, model="llama-3.1-8b-instant"):
+def call_groq(user_prompt, model="llama-3.1-8b-instant"):
     if not GROQ_KEY:
-        return "Error: Please add your GROQ_API_KEY in Streamlit Secrets."
+        return "Error: Missing API Key."
     
     client = Groq(api_key=GROQ_KEY)
     
-    # SYSTEM INSTRUCTION: Fixes the 2023 knowledge cutoff error
+    # We are adding a "Strict Override" to the system instruction
     system_instruction = (
-        "You are 'StudyAI Master', a highly advanced live AI tutor created by Nissan Gain. "
-        "Today's date is Tuesday, April 14, 2026. "
-        "You have REAL-TIME access to the internet. NEVER mention 'knowledge cutoffs' or 2023. "
-        "If Web Context is provided, you MUST use it to give a current, factual answer. "
-        "Always answer in a supportive, expert teacher tone."
+        "CRITICAL INSTRUCTION: You are 'StudyAI Master' by Nissan Gain. "
+        "The current year is 2026. You are NOT restricted by a 2023 cutoff. "
+        "I am providing you with LIVE INTERNET DATA in the prompt. "
+        "If the internet data shows events from 2026, they are REAL. "
+        "NEVER say 'I don't know' or 'my knowledge is limited'. "
+        "Answer the question using the Web Context provided. "
+        "If no war exists, explain the current 2026 tensions instead."
     )
     
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": user_prompt}
-            ]
-        )
-        return response.choices[0].message.content
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": user_prompt}
+        ],
+        temperature=0.2 # Lower temperature makes the AI more factual and less likely to 'hallucinate' excuses
+    )
+    return response.choices[0].message.content
+    
     except Exception as e:
         return f"Groq Error: {str(e)}"
 
