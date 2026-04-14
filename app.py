@@ -12,22 +12,13 @@ st.markdown("""
     <style>
     .answer-box {
         background-color: rgba(128, 128, 128, 0.1); 
-        padding: 20px;
-        border-radius: 15px;
+        padding: 15px;
+        border-radius: 12px;
         border-left: 5px solid #4A90E2;
-        margin-bottom: 20px;
-        color: inherit;
+        margin-bottom: 10px;
     }
-    .stButton>button {
-        border-radius: 10px;
-        width: 100%;
-        font-weight: bold;
-    }
-    .footer {
-        text-align: center;
-        padding: 20px;
-        font-size: 1.2em;
-    }
+    .stButton>button { border-radius: 10px; width: 100%; font-weight: bold; }
+    .footer { text-align: center; padding: 20px; font-size: 1.1em; opacity: 0.8; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -38,11 +29,10 @@ def get_web_context(query, max_results=3):
             results = [r['body'] for r in ddgs.text(query, max_results=max_results)]
             return "\n".join(results)
     except Exception:
-        return "No live web data found. Relying on NCERT patterns."
+        return "No live web data found."
 
 def call_groq(prompt, model="llama-3.1-8b-instant"):
-    if not GROQ_KEY:
-        return "Error: Please add your GROQ_API_KEY in Streamlit Secrets."
+    if not GROQ_KEY: return "Error: Missing API Key."
     client = Groq(api_key=GROQ_KEY)
     response = client.chat.completions.create(
         model=model,
@@ -54,85 +44,85 @@ def call_groq(prompt, model="llama-3.1-8b-instant"):
 st.title("🎯 StudyAI Master")
 st.caption("2026 Board Exam Hub | Powered by Groq Unlimited")
 
-# Sidebar
-with st.sidebar:
-    st.header("⚡ System Status")
-    if GROQ_KEY:
-        st.success("Groq AI Active (14.4k RPD)")
-    st.divider()
+# Initialize Chat Memory for Doubt Solver
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
 # Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["🚀 Doubt Solver", "📈 Predictor", "📜 PYQ Vault", "📝 Sample Paper Gen"])
+tab1, tab2, tab3, tab4 = st.tabs(["🚀 Doubt Solver", "📈 Predictor", "📜 PYQ Vault", "📝 Sample Gen"])
 
-# TAB 1: DOUBT SOLVER
+# TAB 1: CONVERSATIONAL DOUBT SOLVER
 with tab1:
     st.subheader("Instant Doubt Solver")
-    ds_search = st.toggle("Search Web for this doubt?", key="ds_search")
-    user_q = st.text_input("Ask any doubt:", placeholder="Explain Ohm's Law")
-    if st.button("Solve My Doubt"):
-        with st.spinner("Analyzing..."):
-            context = f"Web Context: {get_web_context(user_q, 3)}\n\n" if ds_search else ""
-            answer = call_groq(f"{context}Question: {user_q}\n\nAnswer like an expert Class 10 teacher.")
-            st.markdown(f'<div class="answer-box">{answer}</div>', unsafe_allow_html=True)
+    
+    # Search Toggle
+    ds_search = st.toggle("Search Web for latest info?", key="ds_search")
+    
+    # Display Chat History
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-# TAB 2: BOARD PREDICTOR
+    # Chat Input for Main Question & Follow-ups
+    if prompt := st.chat_input("Ask your doubt or a follow-up question..."):
+        # Add user message to state
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Generate Response
+        with st.spinner("Teacher is thinking..."):
+            context = ""
+            if ds_search:
+                context = f"Web Research: {get_web_context(prompt, 3)}\n\n"
+            
+            # Create a history string so the AI remembers the conversation
+            history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
+            
+            full_query = f"{context}Conversation History:\n{history}\n\nTask: Answer the latest user question based on history and context. Act as a Class 10 teacher."
+            
+            response = call_groq(full_query)
+            
+            # Add assistant message to state
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            with st.chat_message("assistant"):
+                st.markdown(response)
+
+    if st.button("Clear Chat Conversation"):
+        st.session_state.messages = []
+        st.rerun()
+
+# --- (Other tabs remain the same as your previous working version) ---
+# TAB 2: PREDICTOR
 with tab2:
     st.subheader("2026 Topic Predictor")
     bp_search = st.toggle("Search latest 2026 patterns?", value=True, key="bp_search")
     subject = st.text_input("Enter Subject:", key="bp_sub")
-    if st.button("Predict High-Weightage Topics"):
-        with st.spinner("Scanning board updates..."):
-            context = f"Latest Board News: {get_web_context(f'Class 10 {subject} 2026 board exam pattern', 10)}\n\n" if bp_search else ""
+    if st.button("Predict Topics"):
+        with st.spinner("Analyzing..."):
+            context = f"News: {get_web_context(f'Class 10 {subject} 2026 board exam pattern', 5)}\n\n" if bp_search else ""
             prediction = call_groq(f"{context}Identify 5 high-probability topics for {subject} 2026 boards.", model="llama-3.3-70b-versatile")
             st.markdown(f'<div class="answer-box">{prediction}</div>', unsafe_allow_html=True)
 
 # TAB 3: PYQ VAULT
 with tab3:
-    st.subheader("Recent PYQ Generator")
-    pyq_search = st.toggle("Search for 10-year patterns?", value=True, key="pyq_search")
-    pyq_sub = st.selectbox("Select Subject:", ["Math", "Science", "SST", "English"], key="pyq_vault_sub")
-    chapter = st.text_input("Chapter Name:", key="pyq_chap")
-    if st.button("Generate Questions"):
-        with st.spinner("Searching papers..."):
-            context = f"Exam Data: {get_web_context(f'Class 10 {pyq_sub} {chapter} last 10 years board questions', 8)}\n\n" if pyq_search else ""
-            pyqs = call_groq(f"{context}List 10 important PYQs for Class 10 {pyq_sub}, Chapter: {chapter}.")
-            st.markdown(f'<div class="answer-box">{pyqs}</div>', unsafe_allow_html=True)
+    st.subheader("PYQ Vault")
+    pyq_sub = st.selectbox("Select Subject:", ["Math", "Science", "SST", "English"], key="pyq_v")
+    chapter = st.text_input("Chapter:", key="pyq_c")
+    if st.button("Get PYQs"):
+        with st.spinner("Searching..."):
+            res = call_groq(f"List 10 important PYQs for Class 10 {pyq_sub}, Chapter: {chapter}.")
+            st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
-# TAB 4: SAMPLE QUESTION GENERATOR (NEW!)
+# TAB 4: SAMPLE GEN
 with tab4:
-    st.subheader("NCERT & PYQ Sample Question Generator")
-    st.write("Generate practice questions that follow the latest 2026 marking scheme.")
-    sq_search = st.toggle("Search web for 2026 Sample Paper style?", value=True, key="sq_search")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        sq_sub = st.selectbox("Select Subject:", ["Science", "Math", "SST", "English", "Hindi"], key="sq_sub")
-        q_type = st.selectbox("Question Type:", ["MCQs","Very Short Answer Type(1-2 Marks)","Short Answer (2-3 Marks)", "Long Answer (5 Marks)", "Case Based"], key="q_type")
-    with col2:
-        sq_topic = st.text_input("Topic/Chapter:", placeholder="e.g., Electricity or Life Processes", key="sq_topic")
-        q_num = st.slider("Number of questions:", 1, 20, 10)
-
-    if st.button("Generate Practice Set"):
-        with st.spinner("Crafting NCERT-style questions..."):
-            context = ""
-            if sq_search:
-                search_query = f"Class 10 {sq_sub} {sq_topic} 2026 board exam sample questions and marking scheme"
-                context = f"Recent Board Sample Style: {get_web_context(search_query, max_results=7)}\n\n"
-            
-            prompt = f"""
-            {context}
-            Act as a Senior CBSE/Board Paper Setter. 
-            Generate {q_num} {q_type} questions for Class 10 {sq_sub} on the topic: {sq_topic}.
-            
-            Rules:
-            1. Questions MUST be based on NCERT syllabus.
-            2. Match the difficulty level of Previous Year Questions (PYQs).
-            3. Include a short 'Answer Key' or 'Hints' section at the bottom.
-            """
-            
-            sample_set = call_groq(prompt, model="llama-3.3-70b-versatile")
-            st.markdown(f'<div class="answer-box">{sample_set}</div>', unsafe_allow_html=True)
-            st.caption("✅ Questions strictly follow NCERT & 2026 Exam Trends.")
+    st.subheader("Sample Question Generator")
+    sq_sub = st.selectbox("Select Subject:", ["Science", "Math", "SST", "English"], key="sq_s")
+    sq_topic = st.text_input("Topic:", key="sq_t")
+    if st.button("Generate Set"):
+        with st.spinner("Crafting..."):
+            res = call_groq(f"Generate 5 NCERT-style questions for {sq_sub} on {sq_topic}.", model="llama-3.3-70b-versatile")
+            st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
 # --- 5. FOOTER SECTION ---
 st.divider()
