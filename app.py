@@ -108,7 +108,7 @@ with tab3:
             if pyq_search:
                 search_query = f"Class 10 {pyq_sub} {chapter} actual board questions 2024 2025"
                 context = f"Recent Exam Data: {get_web_context(search_query, max_results=8)}\n\n"
-class="answer-box">{pyqs}</div>', unsafe_allow_ht
+class="answer-box">{pyqs}</div>, unsafe_allow_ht
 # --- FOOTER SECTION ---
 st.divider()
 st.markdown(
