@@ -33,7 +33,6 @@ def get_web_context(query, max_results=3):
         return "No live web data found. Relying on NCERT knowledge."
 
 def call_groq(user_prompt, model="llama-3.1-8b-instant"):
-def call_groq(user_prompt, model="llama-3.1-8b-instant"):
     if not GROQ_KEY:
         return "Error: Missing API Key."
     
