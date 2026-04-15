@@ -135,15 +135,39 @@ with tab2:
             res = call_groq(f"{context}Predict 10 high-probability topics for {subject} 2026 CBSE boards.", model="llama-3.3-70b-versatile")
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
-# TAB 3: PYQ VAULT
+# TAB 3: 10-YEAR PYQ SEARCH ENGINE
 with tab3:
-    st.subheader("PYQ Vault")
-    pyq_sub = st.selectbox("Subject:", ["Math", "Science", "SST", "English"], key="pyq_v")
-    chapter = st.text_input("Chapter Name:", key="pyq_c")
-    if st.button("Fetch PYQs"):
-        with st.spinner("Fetching..."):
-            res = call_groq(f"List Last 10 Years PYQs for Class 10 CBSE {pyq_sub}, Chapter: {chapter}.")
+    st.subheader("📜 10-Year PYQ Vault")
+    st.write("Extracting questions from 2015 to 2025 board papers.")
+    
+    pyq_search = st.toggle("Deep Search Web for 10-year trends CBSE Class 10 ?", value=True, key="pyq_search_on")
+    
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        pyq_sub = st.selectbox("Subject:", ["Math", "Science", "SST", "English"], key="pyq_v_sub")
+    with col2:
+        chapter = st.text_input("Chapter/Topic:", placeholder="e.g. Chemical Reactions", key="pyq_c_name")
+    
+    if st.button("🔍 Generate 10-Year PYQs Class 10 CBSE"):
+        with st.spinner(f"Scanning 10 years of board papers for {chapter}..."):
+            context = ""
+            if pyq_search:
+                # Optimized search for 10-year range
+                search_q = f"Class 10 {pyq_sub} {chapter} important board questions 2016 to 2026 CBSE Class 10"
+                context = f"LATEST EXAM DATA: {get_web_context(search_q, 10)}\n\n"
+            
+            prompt = (
+                f"{context}Task: Act as an expert board examiner. Generate a list of the most important Previous Year Questions (PYQs) "
+                f"for Class 10 {pyq_sub}, Chapter: {chapter}, covering the last 10 years (2016-2026).\n\n"
+                "Structure your response as follows:\n"
+                "1. **Most Repeated Questions** (Identify questions that appeared 3+ times).\n"
+                "2. **Year-wise Breakdown** (List 5-10 major questions and mention the year they appeared, e.g., 2018, 2023, 2024, 2026).\n"       
+            )
+            
+            # Using the 70B model for higher accuracy in remembering years
+            res = call_groq(prompt, model="llama-3.3-70b-versatile")
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
+            
 
 # TAB 4: SAMPLE GEN
 with tab4:
