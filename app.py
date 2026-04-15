@@ -1,3 +1,32 @@
+from datetime import datetime # Add this to your imports at the very top
+
+def call_groq(user_prompt, model="llama-3.1-8b-instant"):
+    if not GROQ_KEY:
+        return "Error: Missing API Key."
+    
+    client = Groq(api_key=GROQ_KEY)
+    
+    # This line automatically gets today's date (e.g., April 15, 2026)
+    today = datetime.now().strftime("%B %d, %Y")
+    
+    system_instruction = (
+        f"You are 'StudyAI Master' created by Nissan Gain. "
+        f"Today's date is {today}. " # The AI now always knows the real date!
+        "You have access to REAL-TIME web data provided in the prompt. "
+        "NEVER mention 2023 or knowledge cutoffs. "
+        "Use the web data to provide factual, current updates."
+    )
+    
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": user_prompt}
+        ],
+        temperature=0.2
+    )
+    return response.choices[0].message.content
+    
 import streamlit as st
 from groq import Groq
 from duckduckgo_search import DDGS
