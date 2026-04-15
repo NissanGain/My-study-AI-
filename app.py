@@ -126,13 +126,13 @@ with tab1:
 # TAB 2: PREDICTOR
 with tab2:
     st.subheader("2026 Topic Predictor")
-    bp_search = st.toggle("Search latest 2026 CBSC syllabus?", value=True, key="bp_search")
+    bp_search = st.toggle("Search latest 2026 CBSE syllabus?", value=True, key="bp_search")
     subject = st.text_input("Subject (e.g. Science):")
     if st.button("Predict High-Weightage Topics"):
         with st.spinner("Analyzing..."):
             query = f"Class 10 {subject} 2026 CBSC board exam weightage"
             context = f"2026 NEWS: {get_web_context(query, 5)}\n\n" if bp_search else ""
-            res = call_groq(f"{context}Predict 10 high-probability topics for {subject} 2026 CBSC boards.", model="llama-3.3-70b-versatile")
+            res = call_groq(f"{context}Predict 10 high-probability topics for {subject} 2026 CBSE boards.", model="llama-3.3-70b-versatile")
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
 # TAB 3: PYQ VAULT
@@ -142,7 +142,7 @@ with tab3:
     chapter = st.text_input("Chapter Name:", key="pyq_c")
     if st.button("Fetch PYQs"):
         with st.spinner("Fetching..."):
-            res = call_groq(f"List Last 10 Years PYQs for Class 10 CBSC {pyq_sub}, Chapter: {chapter}.")
+            res = call_groq(f"List Last 10 Years PYQs for Class 10 CBSE {pyq_sub}, Chapter: {chapter}.")
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
 # TAB 4: SAMPLE GEN
@@ -152,7 +152,7 @@ with tab4:
     sq_topic = st.text_input("Topic:", key="sq_t")
     if st.button("Generate Set"):
         with st.spinner("Crafting..."):
-            res = call_groq(f"Generate 20 NCERT-style practice questions based on CBSC class 10 for {sq_sub} on {sq_topic}.", model="llama-3.3-70b-versatile")
+            res = call_groq(f"Generate 20 NCERT-style practice questions based on CBSE class 10 for {sq_sub} on {sq_topic}.", model="llama-3.3-70b-versatile")
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
 # --- 5. FOOTER ---
