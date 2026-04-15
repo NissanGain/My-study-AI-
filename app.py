@@ -1,7 +1,6 @@
 import streamlit as st
 from groq import Groq
 from duckduckgo_search import DDGS
-from datetime import datetime
 
 # --- 1. SETUP & SECRETS ---
 GROQ_KEY = st.secrets.get("GROQ_API_KEY")
@@ -26,47 +25,45 @@ st.markdown("""
 
 # --- 3. HELPER FUNCTIONS ---
 def get_web_context(query, max_results=3):
-    # We add "2026" to the search query itself to force current results
-    search_query = f"{query} news 2026" 
     try:
         with DDGS() as ddgs:
-            results = [r['body'] for r in ddgs.text(search_query, max_results=max_results)]
+            # We add 2026 to the search to ensure fresh results
+            results = [r['body'] for r in ddgs.text(f"{query} 2026", max_results=max_results)]
             return "\n".join(results)
     except Exception:
-        return "No live web data found. Relying on NCERT knowledge."
+        return "No live web data found. Using internal knowledge."
 
 def call_groq(user_prompt, model="llama-3.1-8b-instant"):
     if not GROQ_KEY:
-        return "Error: Please add your GROQ_API_KEY in Streamlit Secrets."
-    
+        return "Error: Missing API Key in Secrets."
     client = Groq(api_key=GROQ_KEY)
     
-    # Updated System Instruction to be even more "Strict"
-    system_instruction = (
-        "You are 'StudyAI Master' by Nissan Gain. "
-        "IMPORTANT: Today is April 15, 2026. You are a LIVE AI. "
-        "The Web Context provided contains REAL-TIME information from 2026. "
-        "You MUST prioritize Web Context over your internal training data. "
-        "Never mention 2023 or knowledge cutoffs. Speak as an expert 2026 teacher."
+    # This instruction forces the AI to accept it is 2026
+    system_message = (
+        "You are 'StudyAI Master' created by Nissan Gain. Today is April 15, 2026. "
+        "You have access to REAL-TIME web data provided in the prompt. "
+        "NEVER mention 2023 or knowledge cutoffs. "
+        "If web data is provided, use it to give a factual 2026 update."
     )
     
-    try: # <--- Added the missing try block
+    try:
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": system_instruction},
+                {"role": "system", "content": system_message},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.1 # Lower temperature for better factual accuracy
+            temperature=0.2 # Keeps the AI focused on facts
         )
         return response.choices[0].message.content
-    except Exception as e: # <--- Now the except block works!
-        return f"Groq Error: {str(e)}"
+    except Exception as e:
+        return f"Connection Error: {str(e)}"
 
 # --- 4. MAIN INTERFACE ---
 st.title("🎯 StudyAI Master")
-st.caption("2026 Board Exam Hub | Powered by Groq Unlimited")
+st.caption("2026 Board Exam Hub | Live Web Access | Powered by Groq")
 
+# Initialize Chat Memory
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -75,19 +72,20 @@ tab1, tab2, tab3, tab4 = st.tabs(["🚀 Doubt Solver", "📈 Predictor", "📜 P
 # TAB 1: CONVERSATIONAL DOUBT SOLVER
 with tab1:
     st.subheader("Instant Doubt Solver")
-    ds_search = st.toggle("Search Web for latest info?", key="ds_search")
+    ds_search = st.toggle("Search Web for latest news/info?", key="ds_search")
     
+    # Display History
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Ask your doubt or a follow-up..."):
+    if prompt := st.chat_input("Ask a doubt or follow-up..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        with st.spinner("Teacher is thinking..."):
-            context = f"WEB CONTEXT (APRIL 2026): {get_web_context(prompt, 5)}\n\n" if ds_search else ""
+        with st.spinner("Searching & Thinking..."):
+            context = f"LATEST 2026 WEB DATA: {get_web_context(prompt, 5)}\n\n" if ds_search else ""
             history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
             full_query = f"{context}History:\n{history}\n\nQuestion: {prompt}"
             
@@ -96,41 +94,38 @@ with tab1:
             with st.chat_message("assistant"):
                 st.markdown(response)
 
-    if st.button("Clear Conversation"):
-        st.session_state.messages = []
-        st.rerun()
-
 # TAB 2: PREDICTOR
 with tab2:
     st.subheader("2026 Topic Predictor")
-    bp_search = st.toggle("Search latest 2026 patterns?", value=True, key="bp_search")
-    subject = st.text_input("Enter Subject (e.g., Physics):", key="bp_sub")
-    if st.button("Predict Topics"):
+    bp_search = st.toggle("Search latest 2026 syllabus?", value=True, key="bp_search")
+    subject = st.text_input("Subject (e.g. Science):")
+    if st.button("Predict High-Weightage Topics"):
         with st.spinner("Analyzing..."):
-            context = f"LATEST 2026 NEWS: {get_web_context(f'Class 10 {subject} 2026 board exam pattern', 5)}\n\n" if bp_search else ""
-            prediction = call_groq(f"{context}Identify 5 high-probability topics for {subject} 2026 boards.", model="llama-3.3-70b-versatile")
-            st.markdown(f'<div class="answer-box">{prediction}</div>', unsafe_allow_html=True)
+            query = f"Class 10 {subject} 2026 board exam weightage"
+            context = f"2026 NEWS: {get_web_context(query, 5)}\n\n" if bp_search else ""
+            res = call_groq(f"{context}Predict 5 high-probability topics for {subject} 2026 boards.", model="llama-3.3-70b-versatile")
+            st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
 # TAB 3: PYQ VAULT
 with tab3:
     st.subheader("PYQ Vault")
-    pyq_sub = st.selectbox("Select Subject:", ["Math", "Science", "SST", "English"], key="pyq_v")
+    pyq_sub = st.selectbox("Subject:", ["Math", "Science", "SST", "English"], key="pyq_v")
     chapter = st.text_input("Chapter Name:", key="pyq_c")
-    if st.button("Get PYQs"):
-        with st.spinner("Searching..."):
+    if st.button("Fetch PYQs"):
+        with st.spinner("Fetching..."):
             res = call_groq(f"List 10 important PYQs for Class 10 {pyq_sub}, Chapter: {chapter}.")
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
 # TAB 4: SAMPLE GEN
 with tab4:
     st.subheader("Sample Question Generator")
-    sq_sub = st.selectbox("Select Subject:", ["Science", "Math", "SST", "English"], key="sq_s")
-    sq_topic = st.text_input("Topic/Chapter:", key="sq_t")
+    sq_sub = st.selectbox("Subject:", ["Math", "Science", "SST", "English"], key="sq_v")
+    sq_topic = st.text_input("Topic:", key="sq_t")
     if st.button("Generate Set"):
         with st.spinner("Crafting..."):
-            res = call_groq(f"Generate 5 NCERT-style questions for {sq_sub} on {sq_topic}.", model="llama-3.3-70b-versatile")
+            res = call_groq(f"Generate 5 NCERT-style practice questions for {sq_sub} on {sq_topic}.", model="llama-3.3-70b-versatile")
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
-# --- 5. FOOTER SECTION ---
+# --- 5. FOOTER ---
 st.divider()
-st.markdown('<div class="footer">Created by <b>Nissan Gain</b> | Last updated: April 2026</div>', unsafe_allow_html=True)
+st.markdown('<div class="footer">Created by <b>Nissan Gain</b> | 2026 Edition</div>', unsafe_allow_html=True)
