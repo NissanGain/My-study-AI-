@@ -1,7 +1,12 @@
-from datetime import datetime # Add this to your imports at the very top
+from datetime import datetime
 import streamlit as st
 from groq import Groq
 from duckduckgo_search import DDGS
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # --- 1. SETUP & SECRETS ---
 GROQ_KEY = st.secrets.get("GROQ_API_KEY")
@@ -27,18 +32,76 @@ st.markdown("""
         border-radius: 8px;
         margin-bottom: 15px;
     }
+    .success-box {
+        background-color: rgba(76, 175, 80, 0.1);
+        padding: 10px;
+        border-left: 5px solid #4CAF50;
+        border-radius: 8px;
+        color: #4CAF50;
+        font-size: 0.9em;
+    }
+    .error-box {
+        background-color: rgba(255, 100, 100, 0.1);
+        padding: 10px;
+        border-left: 5px solid #FF6464;
+        border-radius: 8px;
+        color: #FF6464;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. HELPER FUNCTIONS ---
+@st.cache_data(ttl=300)  # Cache results for 5 minutes
 def get_web_context(query, max_results=3):
+    """Fetch web search results with detailed error reporting"""
     try:
+        search_query = f"{query} 2026"
+        logger.info(f"🔍 Web Search Started: '{search_query}'")
+        
         with DDGS() as ddgs:
-            # We add 2026 to the search to ensure fresh results
-            results = [r['body'] for r in ddgs.text(f"{query} 2026", max_results=max_results)]
-            return "\n".join(results)
-    except Exception:
-        return "No live web data found. Using internal knowledge."
+            # Use text search with timeout
+            results = list(ddgs.text(search_query, max_results=max_results, timeout=10))
+            
+            logger.info(f"✅ DuckDuckGo returned {len(results)} raw results")
+            
+            if not results:
+                logger.warning(f"⚠️ No results from DuckDuckGo for: {search_query}")
+                return None
+            
+            # Extract text content from results
+            extracted_results = []
+            for r in results:
+                try:
+                    body = r.get('body', '') or r.get('snippet', '')
+                    if body:
+                        extracted_results.append(body)
+                except Exception as e:
+                    logger.warning(f"Could not extract result: {e}")
+                    continue
+            
+            if extracted_results:
+                combined = "\n".join(extracted_results)
+                logger.info(f"✅ Successfully extracted {len(extracted_results)} results ({len(combined)} chars)")
+                return combined
+            else:
+                logger.warning("⚠️ Results found but no body/snippet content")
+                return None
+                
+    except ImportError as e:
+        logger.error(f"❌ ImportError: duckduckgo_search not installed - {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"❌ Web search error: {type(e).__name__} - {str(e)}")
+        return None
+
+def display_web_search_status(query, web_data):
+    """Display web search status in the UI"""
+    if web_data is None:
+        st.warning(f"⚠️ Web search returned no results for: '{query}'")
+    elif web_data == "":
+        st.warning(f"⚠️ Web search found results but no content for: '{query}'")
+    else:
+        st.success(f"✅ Web search successful - {len(web_data)} characters of data retrieved")
 
 def get_response_style_config(style):
     """Returns temperature and style hint based on selected style"""
@@ -67,9 +130,8 @@ def call_groq(user_prompt, model="llama-3.1-8b-instant", temperature=0.2, style_
         return "Error: Missing API Key in Secrets."
     client = Groq(api_key=GROQ_KEY)
     
-    # This instruction forces the AI to accept it is 2026
     system_message = (
-        "You are 'StudyAI Master' created by Nissan Gain. Today is April 15, 2026. "
+        "You are 'StudyAI Master' created by Nissan Gain. Today is May 8, 2026. "
         "You have access to REAL-TIME web data provided in the prompt. "
         "NEVER mention 2023 or knowledge cutoffs. "
         "If web data is provided, use it to give a factual 2026 update. "
@@ -132,7 +194,16 @@ with tab1:
             st.markdown(prompt)
 
         with st.spinner("Searching & Thinking..."):
-            context = f"LATEST 2026 WEB DATA: {get_web_context(prompt, 5)}\n\n" if ds_search else ""
+            context = ""
+            if ds_search:
+                web_data = get_web_context(prompt, 5)
+                display_web_search_status(prompt, web_data)
+                if web_data:
+                    context = f"LATEST 2026 WEB DATA:\n{web_data}\n\n"
+                    logger.info(f"📝 Web context added to prompt ({len(context)} chars)")
+                else:
+                    logger.info("📝 No web data, using knowledge base only")
+            
             history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
             full_query = f"{context}History:\n{history}\n\nQuestion: {prompt}"
             
@@ -151,10 +222,14 @@ with tab2:
     subject = st.text_input("Subject (e.g. Science):")
     if st.button("Predict High-Weightage Topics"):
         with st.spinner("Analyzing..."):
-            query = f"Class 10 {subject} 2026 CBSC board exam weightage"
-            context = f"2026 NEWS: {get_web_context(query, 5)}\n\n" if bp_search else ""
+            query = f"Class 10 {subject} 2026 CBSE board exam weightage"
+            context = ""
+            if bp_search:
+                web_data = get_web_context(query, 5)
+                display_web_search_status(query, web_data)
+                if web_data:
+                    context = f"2026 NEWS:\n{web_data}\n\n"
             
-            # Get style config
             style_config = get_response_style_config(st.session_state.response_style)
             
             res = call_groq(f"{context}Predict 10 high-probability topics for {subject} 2026 CBSE boards.", model="llama-3.3-70b-versatile", temperature=style_config["temperature"], style_hint=style_config["hint"])
@@ -167,7 +242,6 @@ with tab3:
     chapter = st.text_input("Chapter Name:", key="pyq_c")
     if st.button("Fetch PYQs"):
         with st.spinner("Fetching..."):
-            # Get style config
             style_config = get_response_style_config(st.session_state.response_style)
             
             res = call_groq(f"List Last 10 Years PYQs for Class 10 CBSE {pyq_sub}, Chapter: {chapter}.", temperature=style_config["temperature"], style_hint=style_config["hint"])
@@ -180,7 +254,6 @@ with tab4:
     sq_topic = st.text_input("Topic:", key="sq_t")
     if st.button("Generate Set"):
         with st.spinner("Crafting..."):
-            # Get style config
             style_config = get_response_style_config(st.session_state.response_style)
             
             res = call_groq(f"Generate 20 NCERT-style practice questions based on CBSE class 10 for {sq_sub} on {sq_topic}.", model="llama-3.3-70b-versatile", temperature=style_config["temperature"], style_hint=style_config["hint"])
