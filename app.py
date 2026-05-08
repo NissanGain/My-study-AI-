@@ -54,36 +54,70 @@ st.markdown("""
         margin: 10px 0;
         font-weight: bold;
     }
+    .debug-panel {
+        background-color: rgba(255, 193, 7, 0.1);
+        padding: 12px;
+        border-radius: 8px;
+        border-left: 4px solid #FFC107;
+        font-family: monospace;
+        font-size: 0.85em;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. HELPER FUNCTIONS ---
+def test_duckduckgo_connection():
+    """Test if DuckDuckGo API is working"""
+    try:
+        logger.info("🧪 Testing DuckDuckGo connection...")
+        with DDGS() as ddgs:
+            results = list(ddgs.text("python programming", max_results=1))
+            if results:
+                logger.info(f"✅ Connection test successful! Got result: {results[0]}")
+                return True, "✅ Connection successful!"
+            else:
+                logger.warning("⚠️ Connection test returned empty results")
+                return False, "⚠️ No results from test query"
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        logger.error(f"❌ Connection test failed: {error_msg}")
+        return False, f"❌ {error_msg}"
+
 @st.cache_data(ttl=600)  # Cache for 10 minutes
 def get_web_search_results(query, max_results=5):
-    """Fetch web search results from DuckDuckGo - ChatGPT style"""
+    """Fetch web search results from DuckDuckGo with detailed debugging"""
     try:
-        search_query = query  # Don't add 2026, let user control it
-        logger.info(f"🔍 Web Search Started: '{search_query}'")
+        logger.info(f"🔍 Starting web search for: '{query}'")
+        print(f"[SEARCH] Query: {query}")
         
         results = []
         with DDGS() as ddgs:
-            for result in ddgs.text(search_query, max_results=max_results):
+            logger.info("📡 Connecting to DuckDuckGo...")
+            for idx, result in enumerate(ddgs.text(query, max_results=max_results)):
                 try:
-                    results.append({
+                    logger.debug(f"Result {idx}: {json.dumps(result, default=str)[:200]}")
+                    processed = {
                         'title': result.get('title', 'No Title'),
                         'snippet': result.get('body', result.get('snippet', '')),
                         'url': result.get('href', '#'),
                         'source': result.get('source', 'Unknown')
-                    })
+                    }
+                    results.append(processed)
                 except Exception as e:
-                    logger.warning(f"Error processing result: {e}")
+                    logger.warning(f"Error processing result {idx}: {e}")
                     continue
         
         logger.info(f"✅ Retrieved {len(results)} results")
         return results if results else None
         
+    except ImportError as e:
+        error_msg = f"Import Error: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        return None
     except Exception as e:
-        logger.error(f"❌ Web search error: {type(e).__name__} - {str(e)}")
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        logger.error(f"❌ Web search error: {error_msg}")
+        print(f"[ERROR] {error_msg}")
         return None
 
 def format_web_results_for_ai(results):
@@ -190,6 +224,41 @@ with col2:
         key="response_style_selector"
     )
 st.markdown('</div>', unsafe_allow_html=True)
+
+# DEBUG PANEL
+with st.expander("🔧 Debug Web Search"):
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🧪 Test Connection"):
+            success, msg = test_duckduckgo_connection()
+            if success:
+                st.success(msg)
+            else:
+                st.error(msg)
+    
+    with col2:
+        if st.button("🔍 Test Search"):
+            st.info("Testing search for 'python programming'...")
+            results = get_web_search_results("python programming", max_results=3)
+            if results:
+                st.success(f"✅ Got {len(results)} results")
+                for i, r in enumerate(results, 1):
+                    st.write(f"{i}. {r['title'][:50]}...")
+            else:
+                st.error("❌ Search returned no results")
+    
+    with col3:
+        if st.button("📋 Manual Test"):
+            test_query = st.text_input("Enter search query:", "2026 Iran news", key="test_query")
+            if test_query:
+                st.info(f"Searching for: {test_query}")
+                results = get_web_search_results(test_query, max_results=5)
+                if results:
+                    st.success(f"✅ Found {len(results)} results")
+                    display_web_results_ui(results)
+                else:
+                    st.error("❌ No results found")
 
 tab1, tab2, tab3, tab4 = st.tabs(["🚀 Doubt Solver", "📈 Predictor", "📜 PYQ Vault", "📝 Sample Gen"])
 
