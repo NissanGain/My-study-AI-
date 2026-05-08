@@ -1,8 +1,8 @@
 from datetime import datetime
 import streamlit as st
 from groq import Groq
-from duckduckgo_search import DDGS
 import logging
+import requests
 import json
 
 # Configure logging
@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 # --- 1. SETUP & SECRETS ---
 GROQ_KEY = st.secrets.get("GROQ_API_KEY")
+SERPAPI_KEY = st.secrets.get("SERPAPI_KEY")  # Alternative free search API
 
 st.set_page_config(page_title="StudyAI Master", page_icon="🎯", layout="wide")
 
@@ -62,63 +63,102 @@ st.markdown("""
         font-family: monospace;
         font-size: 0.85em;
     }
+    .config-box {
+        background-color: rgba(76, 175, 80, 0.1);
+        padding: 10px;
+        border-left: 4px solid #4CAF50;
+        border-radius: 8px;
+        font-size: 0.9em;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. HELPER FUNCTIONS ---
-def test_duckduckgo_connection():
-    """Test if DuckDuckGo API is working"""
+def get_web_search_results_fallback(query, max_results=5):
+    """Fallback: Use requests to scrape web results when DuckDuckGo fails"""
     try:
-        logger.info("🧪 Testing DuckDuckGo connection...")
-        with DDGS() as ddgs:
-            results = list(ddgs.text("python programming", max_results=1))
-            if results:
-                logger.info(f"✅ Connection test successful! Got result: {results[0]}")
-                return True, "✅ Connection successful!"
-            else:
-                logger.warning("⚠️ Connection test returned empty results")
-                return False, "⚠️ No results from test query"
+        logger.info(f"🌐 Using fallback web search for: '{query}'")
+        
+        # Try using a simple requests-based search via DuckDuckGo HTML
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        # Try alternative: Use searx meta-search engine (usually more reliable)
+        url = "https://searx.be/search"
+        params = {
+            'q': query,
+            'format': 'json',
+            'pageno': 1
+        }
+        
+        response = requests.get(url, params=params, timeout=10, headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            results = []
+            
+            if 'results' in data:
+                for idx, result in enumerate(data['results'][:max_results]):
+                    results.append({
+                        'title': result.get('title', 'No Title'),
+                        'snippet': result.get('content', result.get('summary', 'No content')),
+                        'url': result.get('url', '#'),
+                        'source': 'Searx'
+                    })
+            
+            logger.info(f"✅ Fallback search got {len(results)} results")
+            return results if results else None
+        else:
+            logger.warning(f"⚠️ Fallback search returned status {response.status_code}")
+            return None
+            
     except Exception as e:
-        error_msg = f"{type(e).__name__}: {str(e)}"
-        logger.error(f"❌ Connection test failed: {error_msg}")
-        return False, f"❌ {error_msg}"
+        logger.error(f"❌ Fallback search error: {type(e).__name__}: {str(e)}")
+        return None
 
-@st.cache_data(ttl=600)  # Cache for 10 minutes
-def get_web_search_results(query, max_results=5):
-    """Fetch web search results from DuckDuckGo with detailed debugging"""
+def get_web_search_results_duckduckgo(query, max_results=5):
+    """Try DuckDuckGo search"""
     try:
-        logger.info(f"🔍 Starting web search for: '{query}'")
-        print(f"[SEARCH] Query: {query}")
+        from duckduckgo_search import DDGS
+        logger.info(f"🔍 Trying DuckDuckGo search for: '{query}'")
         
         results = []
-        with DDGS() as ddgs:
-            logger.info("📡 Connecting to DuckDuckGo...")
-            for idx, result in enumerate(ddgs.text(query, max_results=max_results)):
+        with DDGS(timeout=10) as ddgs:
+            for result in ddgs.text(query, max_results=max_results):
                 try:
-                    logger.debug(f"Result {idx}: {json.dumps(result, default=str)[:200]}")
                     processed = {
                         'title': result.get('title', 'No Title'),
                         'snippet': result.get('body', result.get('snippet', '')),
                         'url': result.get('href', '#'),
-                        'source': result.get('source', 'Unknown')
+                        'source': 'DuckDuckGo'
                     }
                     results.append(processed)
                 except Exception as e:
-                    logger.warning(f"Error processing result {idx}: {e}")
+                    logger.warning(f"Error processing result: {e}")
                     continue
         
-        logger.info(f"✅ Retrieved {len(results)} results")
+        logger.info(f"✅ DuckDuckGo got {len(results)} results")
         return results if results else None
         
-    except ImportError as e:
-        error_msg = f"Import Error: {str(e)}"
-        logger.error(f"❌ {error_msg}")
-        return None
     except Exception as e:
-        error_msg = f"{type(e).__name__}: {str(e)}"
-        logger.error(f"❌ Web search error: {error_msg}")
-        print(f"[ERROR] {error_msg}")
+        logger.error(f"❌ DuckDuckGo error: {type(e).__name__}: {str(e)}")
         return None
+
+def get_web_search_results(query, max_results=5):
+    """Get web search results - tries multiple sources"""
+    logger.info(f"🔍 Starting web search for: '{query}'")
+    
+    # Try DuckDuckGo first
+    results = get_web_search_results_duckduckgo(query, max_results)
+    if results:
+        return results
+    
+    # Fallback to Searx if DuckDuckGo fails
+    logger.info("📡 DuckDuckGo failed, trying fallback search engine...")
+    results = get_web_search_results_fallback(query, max_results)
+    
+    return results
 
 def format_web_results_for_ai(results):
     """Format web results for AI to use in response"""
@@ -149,6 +189,7 @@ def display_web_results_ui(results):
             st.markdown(f'<span class="source-title">📌 Source {i}: {result["title"]}</span>', unsafe_allow_html=True)
             st.markdown(f'**Content:** {result["snippet"]}')
             st.markdown(f'🔗 [Read Full Article]({result["url"]})')
+            st.markdown(f'**Source:** {result.get("source", "Unknown")}')
             st.markdown('</div>', unsafe_allow_html=True)
 
 def get_response_style_config(style):
@@ -225,40 +266,47 @@ with col2:
     )
 st.markdown('</div>', unsafe_allow_html=True)
 
-# DEBUG PANEL
-with st.expander("🔧 Debug Web Search"):
-    col1, col2, col3 = st.columns(3)
+# DEBUG & CONFIG PANEL
+with st.expander("🔧 Debug & Configuration"):
+    st.markdown("**Search Method:** DuckDuckGo (Primary) → Searx (Fallback)")
+    
+    col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("🧪 Test Connection"):
-            success, msg = test_duckduckgo_connection()
-            if success:
-                st.success(msg)
-            else:
-                st.error(msg)
+        if st.button("🧪 Test DuckDuckGo"):
+            try:
+                from duckduckgo_search import DDGS
+                st.info("Testing DuckDuckGo...")
+                results = get_web_search_results_duckduckgo("python", max_results=1)
+                if results:
+                    st.success(f"✅ DuckDuckGo working! Got result: {results[0]['title'][:50]}...")
+                else:
+                    st.warning("⚠️ DuckDuckGo returned no results")
+            except ImportError:
+                st.error("❌ duckduckgo-search not installed")
+            except Exception as e:
+                st.error(f"❌ {str(e)}")
     
     with col2:
-        if st.button("🔍 Test Search"):
-            st.info("Testing search for 'python programming'...")
-            results = get_web_search_results("python programming", max_results=3)
+        if st.button("🌐 Test Fallback Search"):
+            st.info("Testing fallback search engine...")
+            results = get_web_search_results_fallback("python programming", max_results=1)
             if results:
-                st.success(f"✅ Got {len(results)} results")
-                for i, r in enumerate(results, 1):
-                    st.write(f"{i}. {r['title'][:50]}...")
+                st.success(f"✅ Fallback working! Got result: {results[0]['title'][:50]}...")
             else:
-                st.error("❌ Search returned no results")
+                st.error("❌ Fallback search failed")
     
-    with col3:
-        if st.button("📋 Manual Test"):
-            test_query = st.text_input("Enter search query:", "2026 Iran news", key="test_query")
-            if test_query:
-                st.info(f"Searching for: {test_query}")
-                results = get_web_search_results(test_query, max_results=5)
-                if results:
-                    st.success(f"✅ Found {len(results)} results")
-                    display_web_results_ui(results)
-                else:
-                    st.error("❌ No results found")
+    # Manual test
+    st.markdown("---")
+    test_query = st.text_input("🔍 Manual Search Test:", value="2026 Iran news", key="manual_test")
+    if st.button("Search"):
+        with st.spinner("Searching..."):
+            results = get_web_search_results(test_query, max_results=5)
+            if results:
+                st.success(f"✅ Found {len(results)} results!")
+                display_web_results_ui(results)
+            else:
+                st.error("❌ No results found")
 
 tab1, tab2, tab3, tab4 = st.tabs(["🚀 Doubt Solver", "📈 Predictor", "📜 PYQ Vault", "📝 Sample Gen"])
 
