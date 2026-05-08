@@ -1,32 +1,4 @@
 from datetime import datetime # Add this to your imports at the very top
-
-def call_groq(user_prompt, model="llama-3.1-8b-instant"):
-    if not GROQ_KEY:
-        return "Error: Missing API Key."
-    
-    client = Groq(api_key=GROQ_KEY)
-    
-    # This line automatically gets today's date (e.g., April 15, 2026)
-    today = datetime.now().strftime("%B %d, %Y")
-    
-    system_instruction = (
-        f"You are 'StudyAI Master' created by Nissan Gain. "
-        f"Today's date is {today}. " # The AI now always knows the real date!
-        "You have access to REAL-TIME web data provided in the prompt. "
-        "NEVER mention 2023 or knowledge cutoffs. "
-        "Use the web data to provide factual, current updates."
-    )
-    
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": user_prompt}
-        ],
-        temperature=0.2
-    )
-    return response.choices[0].message.content
-    
 import streamlit as st
 from groq import Groq
 from duckduckgo_search import DDGS
@@ -49,6 +21,12 @@ st.markdown("""
     }
     .stButton>button { border-radius: 10px; width: 100%; font-weight: bold; }
     .footer { text-align: center; padding: 20px; font-size: 1.1em; opacity: 0.8; }
+    .style-selector { 
+        background-color: rgba(74, 144, 226, 0.1);
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -62,7 +40,29 @@ def get_web_context(query, max_results=3):
     except Exception:
         return "No live web data found. Using internal knowledge."
 
-def call_groq(user_prompt, model="llama-3.1-8b-instant"):
+def get_response_style_config(style):
+    """Returns temperature and style hint based on selected style"""
+    styles = {
+        "📚 Factual": {
+            "temperature": 0.1,
+            "hint": "Be precise, data-driven, and focus on facts."
+        },
+        "⚖️ Balanced": {
+            "temperature": 0.5,
+            "hint": "Provide balanced, clear explanations with examples."
+        },
+        "✨ Creative": {
+            "temperature": 0.8,
+            "hint": "Be creative, use analogies, and make learning engaging."
+        },
+        "🎨 Poetic": {
+            "temperature": 1.0,
+            "hint": "Use poetic language, metaphors, and storytelling."
+        }
+    }
+    return styles.get(style, styles["⚖️ Balanced"])
+
+def call_groq(user_prompt, model="llama-3.1-8b-instant", temperature=0.2, style_hint=""):
     if not GROQ_KEY:
         return "Error: Missing API Key in Secrets."
     client = Groq(api_key=GROQ_KEY)
@@ -72,7 +72,8 @@ def call_groq(user_prompt, model="llama-3.1-8b-instant"):
         "You are 'StudyAI Master' created by Nissan Gain. Today is April 15, 2026. "
         "You have access to REAL-TIME web data provided in the prompt. "
         "NEVER mention 2023 or knowledge cutoffs. "
-        "If web data is provided, use it to give a factual 2026 update."
+        "If web data is provided, use it to give a factual 2026 update. "
+        f"{style_hint}"
     )
     
     try:
@@ -82,7 +83,7 @@ def call_groq(user_prompt, model="llama-3.1-8b-instant"):
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.2 # Keeps the AI focused on facts
+            temperature=temperature
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -92,9 +93,26 @@ def call_groq(user_prompt, model="llama-3.1-8b-instant"):
 st.title("🎯 StudyAI Master")
 st.caption("2026 Board Exam Hub | Live Web Access | Powered by Groq")
 
-# Initialize Chat Memory
+# Initialize Chat Memory & Response Style
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "response_style" not in st.session_state:
+    st.session_state.response_style = "⚖️ Balanced"
+
+# Global Response Style Selector
+st.markdown('<div class="style-selector">', unsafe_allow_html=True)
+col1, col2 = st.columns([2, 3])
+with col1:
+    st.markdown("**🎯 Response Style:**")
+with col2:
+    st.session_state.response_style = st.radio(
+        "Choose AI behavior",
+        ["📚 Factual", "⚖️ Balanced", "✨ Creative", "🎨 Poetic"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="response_style_selector"
+    )
+st.markdown('</div>', unsafe_allow_html=True)
 
 tab1, tab2, tab3, tab4 = st.tabs(["🚀 Doubt Solver", "📈 Predictor", "📜 PYQ Vault", "📝 Sample Gen"])
 
@@ -118,7 +136,10 @@ with tab1:
             history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
             full_query = f"{context}History:\n{history}\n\nQuestion: {prompt}"
             
-            response = call_groq(full_query)
+            # Get style config
+            style_config = get_response_style_config(st.session_state.response_style)
+            
+            response = call_groq(full_query, temperature=style_config["temperature"], style_hint=style_config["hint"])
             st.session_state.messages.append({"role": "assistant", "content": response})
             with st.chat_message("assistant"):
                 st.markdown(response)
@@ -132,7 +153,11 @@ with tab2:
         with st.spinner("Analyzing..."):
             query = f"Class 10 {subject} 2026 CBSC board exam weightage"
             context = f"2026 NEWS: {get_web_context(query, 5)}\n\n" if bp_search else ""
-            res = call_groq(f"{context}Predict 10 high-probability topics for {subject} 2026 CBSE boards.", model="llama-3.3-70b-versatile")
+            
+            # Get style config
+            style_config = get_response_style_config(st.session_state.response_style)
+            
+            res = call_groq(f"{context}Predict 10 high-probability topics for {subject} 2026 CBSE boards.", model="llama-3.3-70b-versatile", temperature=style_config["temperature"], style_hint=style_config["hint"])
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
 # TAB 3: PYQ VAULT
@@ -142,7 +167,10 @@ with tab3:
     chapter = st.text_input("Chapter Name:", key="pyq_c")
     if st.button("Fetch PYQs"):
         with st.spinner("Fetching..."):
-            res = call_groq(f"List Last 10 Years PYQs for Class 10 CBSE {pyq_sub}, Chapter: {chapter}.")
+            # Get style config
+            style_config = get_response_style_config(st.session_state.response_style)
+            
+            res = call_groq(f"List Last 10 Years PYQs for Class 10 CBSE {pyq_sub}, Chapter: {chapter}.", temperature=style_config["temperature"], style_hint=style_config["hint"])
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
 # TAB 4: SAMPLE GEN
@@ -152,7 +180,10 @@ with tab4:
     sq_topic = st.text_input("Topic:", key="sq_t")
     if st.button("Generate Set"):
         with st.spinner("Crafting..."):
-            res = call_groq(f"Generate 20 NCERT-style practice questions based on CBSE class 10 for {sq_sub} on {sq_topic}.", model="llama-3.3-70b-versatile")
+            # Get style config
+            style_config = get_response_style_config(st.session_state.response_style)
+            
+            res = call_groq(f"Generate 20 NCERT-style practice questions based on CBSE class 10 for {sq_sub} on {sq_topic}.", model="llama-3.3-70b-versatile", temperature=style_config["temperature"], style_hint=style_config["hint"])
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
 # --- 5. FOOTER ---
