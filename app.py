@@ -245,21 +245,35 @@ def search_searx(query: str, max_results: int = 5) -> list[dict]:
     return []
 
 
-def fetch_page_chunks(url: str, max_chars: int = 1200) -> str:
+def fetch_page_chunks(url: str, max_chars: int = 1500) -> str:
     """
-    Phase 3 — Sliding-window page reader (like ChatGPT does).
-    Fetches a URL and returns plain-text chunks up to max_chars.
-    Falls back silently on error.
+    Phase 3 — Sliding-window page reader.
+    Fetches a URL, strips boilerplate/JS, returns clean readable text.
+    Skips pages that are clearly JS-rendered with no real content.
     """
+    # Skip sites known to return JS blobs or block scrapers
+    SKIP_DOMAINS = ["wikipedia.org", "britannica.com", "jpost.com", "timesofisrael.com"]
+    if any(d in url for d in SKIP_DOMAINS):
+        return ""  # rely on the search snippet instead
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         resp = requests.get(url, timeout=8, headers=headers)
         if resp.status_code != 200:
             return ""
-        # Strip HTML tags → plain text
-        text = re.sub(r"<[^>]+>", " ", resp.text)
+        raw = resp.text
+        # Remove script/style/nav/footer blocks entirely
+        raw = re.sub(r"<script[^>]*>.*?</script>", " ", raw, flags=re.DOTALL | re.IGNORECASE)
+        raw = re.sub(r"<style[^>]*>.*?</style>",   " ", raw, flags=re.DOTALL | re.IGNORECASE)
+        raw = re.sub(r"<nav[^>]*>.*?</nav>",        " ", raw, flags=re.DOTALL | re.IGNORECASE)
+        raw = re.sub(r"<footer[^>]*>.*?</footer>",  " ", raw, flags=re.DOTALL | re.IGNORECASE)
+        # Strip remaining HTML tags
+        text = re.sub(r"<[^>]+>", " ", raw)
+        # Clean whitespace and JSON-like noise
         text = re.sub(r"\s+", " ", text).strip()
-        # Return first max_chars (the most important content is usually at top)
+        text = re.sub(r'[{}\[\]\"\\'  + r"']", "", text)
+        # Discard if it looks like raw JS (SPA sites)
+        if text.count("function(") > 3 or text.count("var ") > 5 or len(text) < 100:
+            return ""
         return text[:max_chars]
     except Exception:
         return ""
@@ -351,17 +365,21 @@ def render_sources_panel(results: list[dict]):
 
 
 def format_results_for_ai(results: list[dict]) -> str:
-    """Formats search results into a clean context block for the LLM."""
+    """Formats search results into a commanding context block the LLM MUST use."""
     if not results:
         return ""
-    block = "\n\n[LIVE WEB SEARCH CONTEXT]\n"
-    block += "Use the sources below. Cite them inline as [1], [2], etc.\n"
+    block  = "\n\n<<<MANDATORY WEB SEARCH RESULTS — YOU MUST USE THESE>>>\n"
+    block += "RULE: Your answer MUST be built entirely from the sources below.\n"
+    block += "RULE: You MUST cite every fact with [1], [2], etc.\n"
+    block += "RULE: Do NOT say 'I was unable to find' — the results are right here.\n"
+    block += "RULE: Do NOT suggest the user check other websites — answer directly.\n"
     block += "=" * 60 + "\n"
     for i, r in enumerate(results, 1):
-        block += f"\n[{i}] {r['title']}\n"
-        block += f"URL: {r['url']}\n"
-        block += f"Content: {r['snippet']}\n"
+        block += f"\n[{i}] TITLE: {r['title']}\n"
+        block += f"    URL: {r['url']}\n"
+        block += f"    CONTENT: {r['snippet']}\n"
         block += "-" * 40 + "\n"
+    block += "\n<<<END OF WEB RESULTS — NOW ANSWER USING ONLY THE ABOVE>>>\n"
     return block
 
 
@@ -379,18 +397,31 @@ def get_response_style_config(style):
     return styles.get(style, styles["⚖️ Balanced"])
 
 
-def call_groq(user_prompt, model="llama-3.1-8b-instant", temperature=0.2, style_hint=""):
+def call_groq(user_prompt, model="llama-3.3-70b-versatile", temperature=0.2, style_hint=""):
     if not GROQ_KEY:
         return "Error: Missing GROQ_API_KEY in Streamlit secrets."
     client = Groq(api_key=GROQ_KEY)
+    today = datetime.now().strftime("%B %d, %Y")
     system_message = (
-        "You are 'StudyAI Master' created by Nissan Gain. "
-        f"Today is {datetime.now().strftime('%B %d, %Y')}. "
-        "You have access to REAL-TIME web search results provided in the prompt. "
-        "When web results are provided, synthesise them into a clear answer. "
-        "Always cite sources inline using [1], [2], etc. corresponding to the numbered sources. "
-        "If no web results are provided, answer from your training knowledge and say so. "
-        f"{style_hint}"
+        f"You are StudyAI Master, an AI assistant. Today is {today}.\n\n"
+        "CRITICAL RULES - FOLLOW EXACTLY:\n"
+        "1. When the prompt contains MANDATORY WEB SEARCH RESULTS, read every numbered source "
+        "carefully and build your answer from that content.\n"
+        "2. CITATIONS: Only cite [1] [2] [3] for sources actually listed and numbered in the "
+        "web results. NEVER invent citations that are not in the provided sources. "
+        "Hallucinated citations like [1] Iran hostage crisis Wikipedia are strictly forbidden.\n"
+        "3. If web snippets are thin or mostly metadata, say: The search found these pages but "
+        "content was limited. Based on what was retrieved: ... then summarise what is there, "
+        "then add relevant context from training knowledge clearly labelled as "
+        "From training knowledge:.\n"
+        "4. NEVER say I was unable to find information when sources exist - always extract "
+        "something useful from them.\n"
+        "5. NEVER list websites for the user to check themselves - YOU answer directly.\n"
+        "6. If a query asks about a specific event and web results do not confirm it happened, "
+        "say clearly: Based on current web results, this event is not confirmed. Here is what "
+        "is known: then give accurate context.\n"
+        "7. Only use pure training knowledge if there are truly zero web results.\n\n"
+        f"Style: {style_hint}"
     )
     try:
         response = client.chat.completions.create(
@@ -497,54 +528,41 @@ with tab1:
             st.session_state.messages.append({"role": "assistant", "content": response})
             with st.chat_message("assistant"):
                 st.markdown(response)
-
-# ── TAB 2: PREDICTOR ─────────────────────────────────────────
+# TAB 2: PREDICTOR
 with tab2:
     st.subheader("2026 Topic Predictor")
-    bp_search = st.toggle("🌐 Search latest CBSE info?", value=True, key="bp_search")
+    bp_search = st.toggle("Search latest 2026 CBSE syllabus?", value=True, key="bp_search")
     subject = st.text_input("Subject (e.g. Science):")
-
-    if st.button("Predict High-Weightage Topics", use_container_width=True):
-        with st.spinner("🔍 Analysing with web data…"):
-            web_context = ""
-            if bp_search and subject:
-                search_data = chatgpt_style_search(
-                    f"Class 10 {subject} 2026 CBSE board exam high weightage important topics",
-                    max_results_per_query=4
-                )
-                if search_data["results"]:
-                    render_search_status(search_data["queries"], len(search_data["results"]))
-                    render_sources_panel(search_data["results"])
-                    web_context = format_results_for_ai(search_data["results"])
-
+    if st.button("Predict High-Weightage Topics"):
+        with st.spinner("Analyzing..."):
+            query = f"Class 10 {subject} 2026 CBSC board exam weightage"
+            context = f"2026 NEWS: {get_web_context(query, 5)}\n\n" if bp_search else ""
+            
+            # Get style config
             style_config = get_response_style_config(st.session_state.response_style)
-            res = call_groq(
-                f"{web_context}\n\nPredict 10 high-probability topics for Class 10 CBSE {subject} 2026.",
-                model="llama-3.3-70b-versatile",
-                temperature=style_config["temperature"],
-                style_hint=style_config["hint"]
-            )
+            
+            res = call_groq(f"{context}Predict 10 high-probability topics for {subject} 2026 CBSE boards.", model="llama-3.3-70b-versatile", temperature=style_config["temperature"], style_hint=style_config["hint"])
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
-# ── TAB 3: PYQ VAULT ─────────────────────────────────────────
+# TAB 3: PYQ VAULT
 with tab3:
     st.subheader("PYQ Vault")
     pyq_sub = st.selectbox("Subject:", ["Math", "Science", "SST", "English"], key="pyq_v")
-    chapter  = st.text_input("Chapter Name:", key="pyq_c")
-
-    if st.button("Fetch PYQs", use_container_width=True):
-        with st.spinner("Fetching…"):
+    chapter = st.text_input("Chapter Name:", key="pyq_c")
+    if st.button("Fetch PYQs"):
+        with st.spinner("Fetching..."):
+            # Get style config
             style_config = get_response_style_config(st.session_state.response_style)
-            res = call_groq(
-                f"List last 10 years PYQs for Class 10 CBSE {pyq_sub}, Chapter: {chapter}.",
-                temperature=style_config["temperature"],
-                style_hint=style_config["hint"]
-            )
+            
+            res = call_groq(f"List Last 10 Years PYQs for Class 10 CBSE {pyq_sub}, Chapter: {chapter}.", temperature=style_config["temperature"], style_hint=style_config["hint"])
             st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
-# ── TAB 4: SAMPLE GEN ────────────────────────────────────────
+# TAB 4: SAMPLE GEN
 with tab4:
     st.subheader("Sample Question Generator")
-    sq_sub   = st.selectbox("Subject:", ["Math", "Science", "SST", "English"], key="sq_v")
-
-                    
+    sq_sub = st.selectbox("Subject:", ["Math", "Science", "SST", "English"], key="sq_v")
+    sq_topic = st.text_input("Topic:", key="sq_t")
+    if st.button("Generate Set"):
+        with st.spinner("Crafting..."):
+            # Get style config
+            style_config = get_response_style_config(st.session_state.response_style)
