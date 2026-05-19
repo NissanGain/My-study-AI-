@@ -178,6 +178,7 @@ def rewrite_query_for_search(user_question: str, model="llama-3.1-8b-instant") -
             f"Today is {today}. "
             "Respond ONLY with a JSON array of strings. No explanation. Example: "
             '["query one", "query two"]'
+            f"and all block math equations in double $$ symbols. Do NOT use \\[ or \\].\n"
         )
         resp = client.chat.completions.create(
             model=model,
