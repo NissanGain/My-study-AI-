@@ -178,7 +178,6 @@ def rewrite_query_for_search(user_question: str, model="llama-3.1-8b-instant") -
             f"Today is {today}. "
             "Respond ONLY with a JSON array of strings. No explanation. Example: "
             '["query one", "query two"]'
-            f"and all block math equations in double $$ symbols. Do NOT use \\[ or \\].\n"
         )
         resp = client.chat.completions.create(
             model=model,
@@ -423,6 +422,7 @@ def call_groq(user_prompt, model="llama-3.3-70b-versatile", temperature=0.2, sty
         "is known: then give accurate context.\n"
         "7. Only use pure training knowledge if there are truly zero web results.\n\n"
         f"Style: {style_hint}"
+        f"and all block math equations in double $$ symbols. Do NOT use \\[ or \\].\n"
     )
     try:
         response = client.chat.completions.create(
