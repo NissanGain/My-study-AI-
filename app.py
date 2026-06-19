@@ -383,6 +383,28 @@ def format_results_for_ai(results: list[dict]) -> str:
     return block
 
 
+# New helper to provide short aggregated web context used in some tabs
+def get_web_context(query: str, max_results: int = 4) -> str:
+    """Return a short aggregated web-context string for a query.
+
+    This uses the existing chatgpt_style_search pipeline and joins title/snippet/url
+    lines for easy consumption by downstream prompts. If the search fails, returns
+    an empty string.
+    """
+    try:
+        search_res = chatgpt_style_search(query, max_results_per_query=max_results)
+        lines = []
+        for i, r in enumerate(search_res.get("results", []), 1):
+            title = r.get("title", "No Title")
+            snippet = r.get("snippet", "")
+            url = r.get("url", "#")
+            lines.append(f"[{i}] {title} — {snippet} ({url})")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning(f"get_web_context failed: {e}")
+        return ""
+
+
 # ═══════════════════════════════════════════════════════════════
 # 5. GROQ CALL
 # ═══════════════════════════════════════════════════════════════
