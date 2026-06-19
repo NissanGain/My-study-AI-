@@ -624,7 +624,11 @@ with tab4:
                 st.error("Please enter a topic.")
             else:
                 try:
-                    prompt = f"Generate 10 sample questions for Class 10 {sq_sub}, Topic: {topic}. For each question provide: (1) question text, (2) marks/difficulty level, and (3) a brief answer[...]
+                    prompt = (
+                        f"Generate 10 sample questions for Class 10 {sq_sub}, Topic: {topic}. "
+                        "For each question provide: (1) question text, (2) marks/difficulty level, and "
+                        "(3) a brief answer. Number them."
+                    )
                     res = call_groq(prompt, temperature=style_config["temperature"], style_hint=style_config["hint"])
                     st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
                 except Exception as e:
