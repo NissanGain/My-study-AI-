@@ -532,19 +532,49 @@ with tab1:
 # TAB 2: PREDICTOR
 with tab2:
     st.subheader("2026 Topic Predictor")
-    bp_search = st.toggle("Search latest 2026 CBSE syllabus?", value=True, key="bp_search")
-    subject = st.text_input("Subject (e.g. Science):")
-    if st.button("Predict High-Weightage Topics"):
-        with st.spinner("Analyzing..."):
-            query = f"Class 10 {subject} 2026 CBSC board exam weightage"
-            context = f"2026 NEWS: {get_web_context(query, 5)}\n\n" if bp_search else ""
-            
-            # Get style config
-            style_config = get_response_style_config(st.session_state.response_style)
-            
-            res = call_groq(f"{context}Predict 10 high-probability topics for {subject} 2026 CBSE boards.", model="llama-3.3-70b-versatile", temperature=style_config["temperature"], style_hint=style_config["hint"])
-            st.markdown(f'<div class="answer-box">{res}</div>', unsafe_allow_html=True)
 
+    bp_search = st.toggle(
+        "Search latest 2026 CBSE syllabus?",
+        value=True,
+        key="bp_search"
+    )
+
+    subject = st.text_input("Subject (e.g. Science):")
+
+    if st.button("Predict High-Weightage Topics"):
+        if not subject.strip():
+            st.error("Please enter a subject.")
+        else:
+            with st.spinner("Analyzing..."):
+                query = f"Class 10 {subject} 2026 CBSE board exam weightage"
+
+                context = (
+                    f"2026 NEWS: {get_web_context(query, 5)}\n\n"
+                    if bp_search else ""
+                )
+
+                style = st.session_state.get(
+                    "response_style",
+                    "Balanced"
+                )
+
+                style_config = get_response_style_config(style)
+
+                try:
+                    res = call_groq(
+                        f"{context}Predict 10 high-probability topics for {subject} 2026 CBSE boards.",
+                        model="llama-3.3-70b-versatile",
+                        temperature=style_config["temperature"],
+                        style_hint=style_config["hint"]
+                    )
+
+                    st.markdown(
+                        f'<div class="answer-box">{res}</div>',
+                        unsafe_allow_html=True
+                    )
+
+                except Exception as e:
+                    st.error(f"Error: {e}")
 # TAB 3: PYQ VAULT
 with tab3:
     st.subheader("PYQ Vault")
